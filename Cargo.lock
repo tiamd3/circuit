@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "circuit"
+name = "digicir"
 version = "0.1.0"

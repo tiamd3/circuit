@@ -9,11 +9,12 @@ pub struct Circuit<S>
     next_valid_id: usize,
 }
 
-impl<S> Circuit<S>
-where
-    S: BinarySignal + Default + Copy
+impl<S> Circuit<S> 
+where 
+    S: BinarySignal
 {
-    pub fn new(input: usize) -> Circuit<S> {
+    pub fn new(input: usize) -> Circuit<S>
+    {
         let signal_map = vec![S::default(); input];
         Self {
             signal_map,
@@ -44,7 +45,7 @@ where
     pub fn execute(&mut self, input: &[S]) {
         input.iter()
             .enumerate()
-            .for_each(|(i, signal)| self.signal_map[i] = *signal);
+            .for_each(|(i, signal)| self.signal_map[i] = signal.clone());
         self.circuit_graph
             .iter()
             .for_each(|gate| { gate.execute(&mut self.signal_map)});

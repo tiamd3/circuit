@@ -1,6 +1,6 @@
 use std::fmt;
 
-pub trait BinarySignal {
+pub trait BinarySignal: Default + Clone {
     fn get_unchecked(&self) -> bool;
     fn from_bool(b: bool) -> Self;
 }

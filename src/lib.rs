@@ -2,6 +2,7 @@
 mod gate;
 mod signal;
 mod circuit;
+mod component;
 
 use std::fmt::Debug;
 use signal::BinarySignal;

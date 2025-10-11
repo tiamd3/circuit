@@ -1,6 +1,10 @@
 [package]
-name = "circuit"
+name = "digicir"
 version = "0.1.0"
 edition = "2024"
+description = "An interesting simulation of a digital circuit"
+license = "MIT"
+repository = "https://github.com/tiamd3/circuit"
+documentation = "https://docs.rs/digicir"
 
 [dependencies]

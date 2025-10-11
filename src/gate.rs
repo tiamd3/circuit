@@ -24,6 +24,18 @@ impl LogicGate {
         }
     }
 
+    pub fn get_type(&self) -> GateType {
+        self.typ
+    }
+
+    pub fn get_input(&self) -> &[usize] {
+        self.input.as_slice()
+    }
+
+    pub fn get_output(&self) -> &[usize] {
+        self.output.as_slice()
+    }
+
     pub fn execute<S>(&self, ctx: &mut [S])
     where
         S: BinarySignal
