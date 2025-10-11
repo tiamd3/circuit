@@ -3,6 +3,7 @@
 
 *目前还在开发初期，随时可能有重大改动*
 
+[doc](https://docs.rs/digicir/latest/digicir/)
 ---
 
 ## Idea

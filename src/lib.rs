@@ -1,3 +1,7 @@
+//!
+//! An interesting simulation of a digital circuit
+//!
+
 #![allow(unused)]
 mod gate;
 mod signal;
