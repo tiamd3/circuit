@@ -1,0 +1,32 @@
+//
+// Created by intellij-pest on 2025-10-17
+// grammar
+// Author: tianmd
+//
+WHITESPACE = _{ " " }
+T_VALUE = { "1" }
+F_VALUE = { "0" }
+gate_name = { "not" | "and" | "or" | "xor"}
+number = @{ ASCII_DIGIT+ }
+bool_value = { T_VALUE | F_VALUE }
+add_gate_default = { gate_name ~ number+ }
+add_gate_with_output = { gate_name ~ number+ ~ ":" ~ number }
+add_gate = {
+    add_gate_default |
+    add_gate_with_output
+}
+input_size_s = { "input" ~ "size" ~ ":" ~ number ~ ";" ~ NEWLINE? }
+add_gate_s = { add_gate ~ ";" ~ NEWLINE? }
+execute = { "execute" ~ ":" ~ bool_value*~ ";" ~ NEWLINE? }
+check = { "check" ~ ":" ~ number ~ ";" ~ NEWLINE? }
+output_table_s = { "table" ~ ":" ~ number+ ~ ";" ~ NEWLINE?}
+
+circuit = {
+    input_size_s ~
+    add_gate_s* ~
+    execute ~
+    check? ~
+    output_table_s?
+}
+
+

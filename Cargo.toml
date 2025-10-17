@@ -8,3 +8,11 @@ repository = "https://github.com/tiamd3/circuit"
 documentation = "https://docs.rs/digicir"
 
 [dependencies]
+eframe = "0.32.3"
+grid = "1.0.0"
+macroquad = "0.4.14"
+pest = "2.8.3"
+pest_derive = "2.8.3"
+serde = "1.0.228"
+serde_json = "1.0.145"
+thiserror = "2.0.17"

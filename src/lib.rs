@@ -3,10 +3,14 @@
 //!
 
 #![allow(unused)]
-mod gate;
 mod signal;
 mod circuit;
 mod component;
+
+mod gate;
+
+pub mod app;
+mod util;
 
 use std::fmt::Debug;
 use signal::BinarySignal;
@@ -24,7 +28,7 @@ fn build_signal_vec<S: BinarySignal>(vec: &[u32]) -> Vec<S> {
     }
     res_vec
 }
-fn test_circuit<S>(circuit: &mut Circuit<S>, input_num: usize, output_indexes: &[usize])
+fn test_circuit_gate<S>(circuit: &mut Circuit<S>, input_num: usize, output_indexes: &[usize])
 where
     S: BinarySignal + Default + Copy + Debug
 {
@@ -38,7 +42,7 @@ where
             temp /= 2;
             input_vec[input_num - j - 1] = S::from_bool(v);
         }
-        circuit.execute(&input_vec);
+        circuit.execute_gates(&input_vec);
         let output = output_indexes.iter()
             .map(|i| (*i, circuit.get_signal(*i)))
             .collect::<Vec<_>>();
@@ -53,14 +57,7 @@ mod tests {
 
     #[test]
     fn test() {
-        let mut circuit: Circuit<Signal> = Circuit::new(2);
-        let out = circuit.add_xor_gate(&[0, 1]);
-        circuit.execute(
-            &build_signal_vec(&[0, 1])
-        );
-        test_circuit(&mut circuit, 2, &[out]);
-        //println!("{:#?}", circuit);
-        //println!("{:?}", circuit.get_signal(out));
+
     }
 }
 
