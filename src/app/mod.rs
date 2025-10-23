@@ -4,10 +4,12 @@ pub mod gate;
 mod paser;
 pub mod repl;
 
+mod editor;
+
 pub fn run() -> eframe::Result {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([600.0, 800.0]),
+            .with_inner_size([1000.0, 800.0]),
         ..Default::default()
     };
 

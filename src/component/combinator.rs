@@ -1,54 +1,123 @@
 use crate::circuit::Circuit;
 use super::info::ComponentInfo;
-use crate::gate::LogicGate;
+use crate::gate::{GateType, LogicGate};
+use crate::signal::BinarySignal;
+use super::LogicComponent;
 
-enum ComponentType {
-    HalfAdder,
+#[derive(Copy, Clone, Debug)]
+pub enum ComponentType {
+    HalfAdder([usize; 2]),
+    BasicRSFF { r: usize, s: usize },
+    RSFF { r: usize, s: usize, c: usize },
 }
-pub struct Combinator {
+
+pub struct BasicCombinator {
     typ: ComponentType,
-    info: ComponentInfo,
+    outputs: Vec<usize>,
     gates: Vec<LogicGate>,
 }
 
-// impl Combinator {
-//     fn new<S>(typ: ComponentType, input: &[usize], circuit: &Circuit<S>) -> Self {
-//
-//     }
-// }
-// /// 如果说这里 HalfAdder 应该有数据，那么数据只有一个作用就是内部状态
-// pub struct HalfAdder;
-//
-//
-//     fn build(&self, input: &[usize], circuit: &mut Circuit<S>) -> Vec<usize>
-//     {
-//         let mut output = vec![0; 2];
-//         output[0] = circuit.add_gate(GateType::Xor(2), input);
-//         output[1] = circuit.add_gate(GateType::And(2), input);
-//         output
-//     }
-//
-//     fn execute(&self, circuit: &Circuit<S>) {
-//
-//     }
-// }
-//
-// /// 基本RS触发器的执行要求对于与非门实现双短路运算
-// ///
-// ///
-// pub struct BRSFlipFlop;
-//
-// impl<S: BinarySignal> LogicComponent<S> for BRSFlipFlop {
-//     fn build(&self, input: &[usize], circuit: &mut Circuit<S>) -> Vec<usize> {
-//         let output = circuit.advance_output(2);
-//         let not_q = output[0];
-//         let q = output[1];
-//         let rd = &[input[0], q];
-//         let sd = &[input[1], not_q];
-//         circuit.add_gate_with_output(GateType::NAnd(2), rd, not_q);
-//         circuit.add_gate_with_output(GateType::NAnd(2), sd, q);
-//         output
-//     }
-// }
-//
+impl BasicCombinator {
+    fn new(typ: ComponentType, output: &[usize]) -> Self {
+        Self {
+            typ,
+            outputs: Vec::new(),
+            gates: Vec::new(),
+        }
+    }
 
+    fn get_type(&self) -> &ComponentType { &self.typ }
+    fn get_outputs(&self) -> &Vec<usize> { &self.outputs }
+    pub fn build<S: BinarySignal>(typ: &ComponentType, circuit: &mut Circuit<S>) -> Self {
+        match typ {
+            ComponentType::HalfAdder(input) => {
+                let output = &circuit.advance_output(2);
+                let mut cor = Self::new(typ.clone(), output);
+                cor.gates.push(LogicGate::new(GateType::Xor(2), input, &output));
+                cor.gates.push(LogicGate::new(GateType::And(2), input, &output));
+                cor
+            }
+            ComponentType::BasicRSFF { r, s} => {
+                let output = &circuit.advance_output(2);
+                let mut cor = Self::new(typ.clone(), output);
+                cor.gates.push(LogicGate::new(
+                    GateType::NAnd(2),
+                    &[*r, output[1]],
+                    &[output[0]],
+                ));
+                cor.gates.push(LogicGate::new(
+                    GateType::NAnd(2),
+                    &[*s, output[0]],
+                    &[output[1]],
+                ));
+                circuit.set_signals(&[
+                    (output[0], S::from_bool(false)),
+                    (output[1], S::from_bool(true)),
+                ]);
+                cor
+            }
+            ComponentType::RSFF { r, s, c} => {
+                let output = &circuit.advance_output(4);
+                let mut cor = Self::new(
+                    typ.clone(), &[output[0], ]);
+                cor.gates.push(LogicGate::new(
+                    GateType::NAnd(2),
+                    &[*r, *c],
+                    &[output[0]],
+                ));
+                cor.gates.push(LogicGate::new(
+                    GateType::NAnd(2),
+                    &[*s, *c],
+                    &[output[1]],
+                ));
+                circuit.set_signals(&[
+                    (output[0], S::from_bool(false)),
+                    (output[1], S::from_bool(true)),
+                ]);
+                cor
+            }
+        }
+    }
+    pub fn execute<S: BinarySignal>(&self, circuit: &mut Circuit<S>) {
+        match self.typ {
+            ComponentType::HalfAdder(_) => {
+                self.gates.iter().for_each(|gate| {
+                    gate.execute(circuit.get_signal_map_mut());
+                });
+            }
+            ComponentType::BasicRSFF { r, s } => {
+                let mut res = Vec::new();
+                self.gates.iter().for_each(|gate| {
+                    res.push(gate.process(circuit.get_signal_map()));
+                });
+                circuit.set_signals(&res);
+            }
+            ComponentType::RSFF { r, s, c } => {
+
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::ffi::c_uint;
+    use crate::signal::Signal;
+    use super::*;
+
+    #[test]
+    fn basic_combinator() {
+        let mut circuit: Circuit<Signal> = Circuit::new_with_input(2);
+        let rs = BasicCombinator::build(
+            &ComponentType::BasicRSFF { r: 0, s: 1},
+            &mut circuit,
+        );
+        println!("{:?}", circuit.get_signal_map());
+        circuit.set_signals(&[
+            (0, Signal::from_bool(true)),
+            (1, Signal::from_bool(true)),
+        ]);
+        rs.execute(&mut circuit);
+        println!("{:?}", circuit.get_signal_map());
+    }
+}

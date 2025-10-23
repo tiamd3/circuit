@@ -32,8 +32,27 @@ where
         }
     }
 
+    pub fn get_input(&self) -> usize { self.input }
+    pub fn get_gates(&self) -> &Vec<LogicGate> { &self.gates }
     pub fn get_signal_size(&self) -> usize {
         self.signal_map.len()
+    }
+    
+    pub fn get_signal_map_mut(&mut self) -> &mut Vec<S> { &mut self.signal_map }
+    pub fn get_signal_map(&self) -> &Vec<S> { &self.signal_map }
+
+    pub fn get_signals(&self, indexes: &[usize]) -> Vec<&S> {
+        indexes.iter().map(move |&i| &self.signal_map[i]).collect::<Vec<&S>>()
+    }
+    
+    pub fn clone_signals(&self, indexes: &[usize]) -> Vec<S> { 
+        indexes.iter().map(move |&i| self.signal_map[i].clone()).collect::<Vec<S>>()
+    }
+
+    pub fn set_signals(&mut self, outputs: &[(usize, S)]) {
+        outputs.iter().for_each(|(output, signal)| {
+            self.signal_map[*output] = signal.clone();
+        })
     }
 
     pub fn add_gate(&mut self, gate_type: GateType, input: &[usize]) -> usize {
@@ -90,14 +109,10 @@ where
             f(self, indexes);
         }
     }
-    pub fn get_signal(&self, index: usize) -> &S {
-        &self.signal_map[index]
-    }
+    
 
     pub fn print_output(&self, indexes: &[usize]) {
-        let outputs = indexes.iter()
-            .map(|&index| self.get_signal(index))
-            .collect::<Vec<_>>();
+        let outputs = self.get_signals(indexes);
         println!("{:?}", outputs);
     }
 }

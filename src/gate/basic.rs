@@ -1,7 +1,7 @@
 //! 作为基本逻辑门部件的 LogicGate，我们将其所有数据放在栈上  
 //! 同时保证输入和输出的参数化定义带来的灵活性
 
-
+use crate::component::LogicComponent;
 use crate::gate::GateType::{Not, Or};
 use crate::gate::LogicGate::{And2, NAnd2, NAnd3, Not1, Or2, Xor2};
 use crate::signal::BinarySignal;
@@ -68,6 +68,36 @@ impl LogicGate {
             => output[0],
         }
     }
+    
+    pub fn process<S>(&self, ctx: &[S]) -> (usize, S)
+    where
+        S: BinarySignal,
+    {
+        match self {
+            Not1(input, output) => {
+                (output[0], ctx[input[0]].not())
+            }
+            And2(input, output) => {
+                (output[0], ctx[input[0]].and(&ctx[input[1]]))
+            }
+            Or2(input, output) => {
+                (output[0], ctx[input[0]].or(&ctx[input[1]]))
+            }
+            Xor2(input, output) => {
+                (output[0], ctx[input[0]].xor(&ctx[input[1]]))
+            }
+            NAnd2(input, output) => {
+                (output[0], ctx[input[0]].and(&ctx[input[1]]).not())
+            }
+            NAnd3(input, output) => {
+                (output[0], 
+                 ctx[input[0]]
+                    .and(&ctx[input[1]])
+                    .and(&ctx[input[2]])
+                    .not())
+            }
+        }
+    }
 
     pub fn execute<S>(&self, ctx: &mut [S])
     where
@@ -93,7 +123,7 @@ impl LogicGate {
                 ctx[output[0]] = ctx[input[0]]
                     .and(&ctx[input[1]])
                     .and(&ctx[input[2]])
-                    .not()
+                    .not();
             }
         }
     }
