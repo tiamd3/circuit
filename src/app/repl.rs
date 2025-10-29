@@ -26,6 +26,7 @@ pub struct ParseMessage {
 #[derive(Debug)]
 pub struct TruthTable {
     flag: bool,
+    data_index: (usize, Vec<usize>),
     data: Vec<(Vec<Signal>, Vec<Signal>)>,
     strings: Vec<String>,
 }
@@ -58,7 +59,11 @@ impl ParseMessage {
 
 impl TruthTable {
     pub fn new() -> Self {
-        Self { flag: false, data: Vec::new(), strings: Vec::new() }
+        Self {
+            flag: false,
+            data_index: (0, vec![]),
+            data: Vec::new(),
+            strings: Vec::new() }
     }
 
     pub fn update(&mut self, circuit: &mut Circuit<Signal>, output: &[usize]) {
@@ -75,32 +80,64 @@ impl TruthTable {
             }
             vec.reverse();
             let input_values = vec.iter()
-                .map(|b| Signal::from_bool(*b))
+                .map(|b| Signal::from_bool(Some(*b)))
                 .collect::<Vec<Signal>>();
-            circuit.execute_gates(&input_values);
+            circuit.execute_gates();
             let output = circuit.clone_signals(output).clone();
             new_data.push((input_values, output));
         }
-        let mut strings = Vec::new();
-        for (input_values, output) in &new_data {
-            strings.push(format!("{:?}", input_values) + "  |  " + &format!("{:?}", output));
-        }
+
         self.flag = true;
+        self.data_index.0 = circuit.get_input();
+        self.data_index.1 = output.to_vec();
         self.data = new_data;
+        self.update_string();
+    }
+
+    fn update_string(&mut self) {
+        let input_size = self.data_index.0;
+        let output = &self.data_index.1;
+
+        let mut strings = Vec::new();
+
+        let mut head = String::new();
+        for i in 0..input_size {
+            head += format!("   {}    ", i).as_str();
+        }
+        head += "   ";
+        for o in &self.data_index.1 {
+            head += format!("   {}    ", o).as_str();
+        }
+        strings.push(head);
+
+        for (input_values, output) in &self.data {
+            let mut line = String::new();
+            for value in input_values {
+                line += format!("   {:?}    ", value).as_str();
+            }
+            line += "   ";
+            for value in output {
+                line += format!("   {:?}    ", value).as_str();
+            }
+            strings.push(line);
+        }
+
         self.strings = strings;
     }
 
     pub fn draw(&self, ui: &mut Ui) {
-        if self.flag {
+        //if self.flag {
             ui.separator();
-            ui.label(RichText::new("Truth Table:").size(18.0).color(Color32::WHITE));
+            ui.label(RichText::new("Truth Table:")
+                .size(18.0)
+                .color(Color32::WHITE)
+            );
             ui.vertical(|ui| {
                 for string in &self.strings {
                     ui.label(RichText::new(string).size(18.0).color(Color32::WHITE));
                 }
             });
-        }
-
+        //}
     }
 }
 
@@ -110,6 +147,15 @@ impl Repl
         Self {
             editor: Editor::new(),
             circuit: Circuit::new(),
+            message: ParseMessage::new(),
+            truth_table: TruthTable::new(),
+        }
+    }
+
+    pub fn new_with_circuit(cc: &CreationContext, circuit: Circuit<Signal>) -> Repl {
+        Self {
+            editor: Editor::new(),
+            circuit,
             message: ParseMessage::new(),
             truth_table: TruthTable::new(),
         }
@@ -136,20 +182,20 @@ impl Repl
     }
 
     pub fn draw_gates(&self, ui: &mut Ui) {
-        if !self.circuit.get_gates().is_empty() {
-            ui.separator();
-            ui.vertical(|ui|{
-                for gate in self.circuit.get_gates() {
-
-                    ui.label(RichText::new(
-                        &format!("{:?}: {:?} > {:?}",
-                                 gate.get_type(), gate.get_input(), gate.get_output()
-                        ))
-                        .color(Color32::WHITE)
-                        .size(18.0));
-                }
-            });
-        }
+        // if !self.circuit.get_gates().is_empty() {
+        //     ui.separator();
+        //     ui.vertical(|ui|{
+        //         for gate in self.circuit.get_gates() {
+        // 
+        //             ui.label(RichText::new(""
+        //                 // &format!("{:?}: {:?} > {:?}",
+        //                 //         // gate.get_type(), gate.get_input(), gate.get_output()
+        //                 )
+        //                 .color(Color32::WHITE)
+        //                 .size(18.0));
+        //         }
+        //     });
+        // }
     }
     pub fn draw_circuit_state(&self, ui: &mut Ui) {
 
@@ -174,6 +220,7 @@ impl Repl
             Ok(_) => (true, "Ok".to_string()),
             Err(e) => (false, e.to_string()),
         };
+
         self.message.update(parse_message, res_flag);
         self.editor.clear_code();
     }
@@ -209,8 +256,11 @@ impl eframe::App for Repl {
 
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-           self.draw_circuit_state(ui);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                self.draw_circuit_state(ui);
+            });
         });
+
         egui::TopBottomPanel::bottom("bottom").show(ctx, |ui| {
             self.update_code_editor(ui, ctx);
         });
@@ -218,11 +268,3 @@ impl eframe::App for Repl {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_code_convert() {
-    }
-}

@@ -3,11 +3,11 @@
 //!
 
 #![allow(unused)]
-mod signal;
-mod circuit;
+pub mod signal;
+pub mod circuit;
 pub mod component;
 
-mod gate;
+pub mod gate;
 
 pub mod app;
 mod util;

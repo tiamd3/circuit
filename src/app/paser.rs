@@ -74,10 +74,10 @@ impl CircuitInterpreter
 {
     fn parse_gate_name(name: &str, input_size: usize) -> Result<GateType, ParError> {
         match name {
-            "not" => Ok(GateType::Not(input_size)),
-            "and" => Ok(GateType::And(input_size)),
-            "or" => Ok(GateType::Or(input_size)),
-            "xor" => Ok(GateType::Xor(input_size)),
+            "not" => Ok(GateType::Not),
+            "and" => Ok(GateType::And),
+            "or" => Ok(GateType::Or),
+            "xor" => Ok(GateType::Xor),
             _ => Err(ParError::UnDefinedError(format!("Unknown gate: {}", name))),
         }
     }
@@ -95,12 +95,9 @@ impl CircuitInterpreter
         match rule {
             Rule::add_gate_default => {
                 let gate_type = Self::parse_gate_name(&gate.as_str(), vec.len())?;
-                circuit.add_gate(gate_type, &vec);
+                //circuit.add_gate(gate_type, &vec);
             }
-            Rule::add_gate_with_output => {
-                let gate_type = Self::parse_gate_name(&gate.as_str(), vec.len()-1)?;
-                circuit.add_gate_with_output(gate_type, &vec, *vec.last().unwrap());
-            }
+
             _ => unreachable!(),
         }
         Ok(())
@@ -111,12 +108,12 @@ impl CircuitInterpreter
         let mut input = Vec::new();
         for bool_pair in inner {
             match bool_pair.into_inner().next().unwrap().as_rule() {
-                Rule::T_VALUE => { input.push(Signal::from_bool(true))}
-                Rule::F_VALUE => { input.push(Signal::from_bool(false))}
+                Rule::T_VALUE => { input.push(Signal::from_bool(Some(true)))}
+                Rule::F_VALUE => { input.push(Signal::from_bool(Some(false)))}
                 _ => unreachable!(),
             }
         }
-        circuit.execute_gates(&input);
+        circuit.execute_gates();
         Ok(())
     }
     fn parse_circuit(circuit: &mut Circuit<Signal>, pair: Pair<Rule>) -> Result<(), ParError> {
@@ -134,6 +131,9 @@ impl CircuitInterpreter
                         .into_inner().next().unwrap()
                         .into_inner().next().unwrap();
                     Self::parse_add_gate(circuit, inner_pair)?;
+                }
+                Rule::pop_gate_s => {
+                    circuit.pop();
                 }
                 Rule::execute => {
                     Self::parse_execute(circuit, pair)?;

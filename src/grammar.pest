@@ -10,6 +10,9 @@ T_VALUE = { "1" }
 F_VALUE = { "0" }
 number = @{ ASCII_DIGIT+ }
 bool_value = { T_VALUE | F_VALUE }
+ident = @ { ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+identifier = @ { !key_word ~ ident }
+key_word = { gate_name | "input" | "execute" | "pop" | "combi"  }
 
 
 gate_name = { "not" | "and" | "or" | "xor"}
@@ -24,6 +27,8 @@ input_size_s = { "input" ~ ":" ~ number ~ NEWLINE }
 //and 0 1;
 //or 2 3 : 5;
 add_gate_s = { add_gate ~ NEWLINE }
+pop_gate_s = { "pop" ~ NEWLINE}
+combinate_gate_s = { "combi" ~ identifier ~ ":" ~ number+ ~ NEWLINE }
 //execute: 0 1 1 1 0;
 execute = { "execute" ~ ":" ~ bool_value* ~ NEWLINE }
 //check: 2;
@@ -32,7 +37,8 @@ table_outputs = { "table" ~ ":" ~ number+ ~ NEWLINE}
 
 circuit = {
     input_size_s? ~
-    add_gate_s*
+    (add_gate_s | pop_gate_s)*
+
 }
 
 state = {

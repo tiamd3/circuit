@@ -1,20 +1,31 @@
-pub mod basic;
+use serde::{Deserialize, Serialize};
+use crate::signal::BinarySignal;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Hash, Clone, Serialize, Deserialize)]
 pub enum GateType {
-    Not(usize),
-    And(usize),
-    Or(usize),
-    Xor(usize),
-    NAnd(usize),
+    Not,
+    And,
+    Or,
+    Xor,
+    NAnd,
 }
 
-#[derive(Debug)]
-pub enum LogicGate {
-    Not1([usize; 1], [usize; 1]),
-    And2([usize; 2], [usize; 1]),
-    Or2([usize; 2], [usize; 1]),
-    Xor2([usize; 2], [usize; 1]),
-    NAnd2([usize; 2], [usize; 1]),
-    NAnd3([usize; 3], [usize; 1]),
+impl GateType {
+    pub fn execute<S: BinarySignal>(&self, input: &[S]) -> S {
+        match self {
+            GateType::Not => input[0].not(),
+            GateType::And => {
+                input.iter().fold(S::from_bool(Some(true)), |acc, v| acc.and(v))
+            }
+            GateType::Or => {
+                input.iter().fold(S::from_bool(Some(false)), |acc, v| acc.or(v))
+            }
+            GateType::Xor => {
+                input[0].xor(&input[1])
+            }
+            GateType::NAnd => {
+                input.iter().fold(S::from_bool(Some(true)), |acc, v| acc.and(v)).not()
+            }
+        }
+    }
 }
