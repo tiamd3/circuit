@@ -1,231 +1,198 @@
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
-use crate::gate::GateType;
-use crate::component::LogicComponent;
-use crate::signal::{BinarySignal, Signal};
+use crate::gate::{GateOutput, GateType, LogicGate};
+use crate::signal::Signal;
+use crate::node::Node;
+use crate::pattern::{Pattern, PatternNode, PniType};
+use crate::msic::*;
 
 pub enum BuildError {
     SampleOutput(usize, usize),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Node {
-    Gate(GateType, Vec<usize>, usize),
-    InBuild,
-    Custom(String, Vec<usize>, usize),
-}
-
-impl Node {
-    pub fn execute<S: BinarySignal>(&self, signals: &[S]) -> S {
-        match self {
-            Node::Gate(gate_type, input, output) => {
-                gate_type.execute(signals)
-            }
-            _ => todo!()
-        }
-    }
-
-    pub fn execute_mut<S: BinarySignal>(&self, signals: &mut [S]) {
-        match self {
-            Node::Gate(gate_type, input, output) => {
-                let input = Circuit::choose_signals(signals, input);
-                signals[*output] = gate_type.execute(&input);
-            }
-            _ => todo!()
-        }
-    }
-
-    pub fn get_output(&self) -> Vec<usize> {
-        match self {
-            Node::Gate(.., output) => vec![*output],
-            _ => todo!()
-        }
-    }
-
-    pub fn get_input(&self) -> &[usize] {
-        match self {
-            Node::Gate(_, input, _) => input,
-            _ => todo!()
-        }
-    }
-
-    pub fn set_output<S: BinarySignal>(&mut self, signals: &mut [S], output: &[S]) {
-        match self {
-            Node::Gate(.., o) => {
-                signals[*o] = output[0].clone();
-            }
-            _ => todo!()
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CombiPattern {
-    input: usize,
-    output: Vec<usize>,
-    pipeline: Vec<Node>,
-}
 
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Circuit<S>
+pub struct Circuit
 {
-    signal_map: Vec<S>,
+    signals: Vec<Signal>,
     input: usize,
 
-    patterns: HashMap<String, CombiPattern>,
-    //inbuilds: Vec<BasicCombinator>,
-    //customs: Vec<Combinator>,
+    pattern_range: (usize, usize),
+    patterns: HashMap<String, Pattern>,
     pipeline: Vec<Node>,
 }
 
-impl<S> Circuit<S> 
-where 
-    S: BinarySignal
-{
-    pub fn new() -> Circuit<S> {
-        Self::new_with_input(0)
-    }
-
-    pub fn new_with_input(input: usize) -> Circuit<S>
+impl Circuit {
+    pub fn new(input: usize) -> Circuit
     {
-        let signal_map = vec![S::default(); input];
         Self {
-            signal_map,
+            signals: vec![Signal::default(); input],
             input,
-            //customs: Vec::new(),
-            //inbuilds: Vec::new(),
+            pattern_range: (0, 0),
             patterns: HashMap::new(),
             pipeline: Vec::new(),
         }
     }
 
-    pub fn get_input(&self) -> usize { self.input }
+    pub fn get_input(&self) -> Vec<usize> {
+        let mut res = vec![0; self.input];
+        for i in 0..self.input {
+            res[i] = i;
+        }
+        res
+    }
+    pub fn get_signals_mut(&mut self) -> &mut Vec<Signal> { &mut self.signals }
+    pub fn get_signals(&self) -> &Vec<Signal> { &self.signals }
+    pub fn get_signal(&self, index: usize) -> Signal { self.signals[index].clone() }
+    pub fn signals_size(&self) -> usize { self.signals.len() }
 
-    pub fn get_signals_mut(&mut self) -> &mut Vec<S> { &mut self.signal_map }
-    pub fn get_signals(&self) -> &Vec<S> { &self.signal_map }
+    pub fn get_node(&self, index: usize) -> &Node { &self.pipeline[index] }
 
-    pub fn build_combi(&self, gates_vec: &[usize]) {
-        let gates_vec = gates_vec.iter()
-            .map(|i| self.pipeline[*i].clone())
-            .collect::<Vec<Node>>();
-
+    pub fn get_parent_node_index(&self, signal: usize) -> Option<usize> {
+        if let Some(signal) = self.signals.get(signal) {
+            if let Some(node) = signal.get_parent() {
+                Some(node)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    pub fn get_parent_node(&self, signal: usize) -> Option<&Node> {
+        self.get_parent_node_index(signal).map(|i| &self.pipeline[i])
     }
 
-    pub fn choose_signals(signals: &[S], indexes: &[usize]) -> Vec<S> {
-        indexes.iter().map(move |&i| signals[i].clone()).collect::<Vec<S>>()
+    pub fn get_nodes_vec(&self, from: usize, to: usize) -> Vec<&Node> {
+        let mut res = Vec::new();
+        for i in from..to {
+            res.push(&self.pipeline[i]);
+        }
+        res
     }
 
-    pub fn get_a_signal(&self, index: usize) -> S { self.signal_map[index].clone() }
-
-    pub fn signal_size(&self) -> usize { self.signal_map.len() }
-    
-    pub fn clone_signals(&self, indexes: &[usize]) -> Vec<S> { 
-        indexes.iter().map(move |&i| self.signal_map[i].clone()).collect::<Vec<S>>()
-    }
-
-    pub fn set_input(&mut self, input: &[usize]) {
+    pub fn set_input_usize(&mut self, input: &[usize]) {
         for (i, u) in input.iter().enumerate() {
-            self.signal_map[i] = S::from_usize(*u);
+            self.signals[i] = Signal::from_usize(*u);
         }
     }
 
-    fn gain_gate_type(gate_type: &str, input_size: usize) -> GateType {
-        match (gate_type, input_size) {
-            ("and", _) => GateType::And,
-            ("or", _) => GateType::Or,
-            ("xor", 2) => GateType::Xor,
-            ("not", 1) => GateType::Not,
-            ("nand", _) => GateType::NAnd,
-            _ => unreachable!()
-        }
+    pub fn build_begin(&mut self) { 
+        self.pattern_range.0 = self.pipeline.len();
+        self.pattern_range.1 = self.signals.len();
     }
-    pub fn add_gate(&mut self, gate_type: &str, input: &[usize]) -> (usize, usize) {
-        let gate_type = Self::gain_gate_type(gate_type, input.len());
-        let new_gate = Node::Gate(gate_type, input.to_vec(), self.signal_size());
-        self.pipeline.push(new_gate);
-        let node_index = self.pipeline.len() - 1;
-        self.signal_map.push(S::with_parent(None, node_index));
-        (node_index, self.signal_size() - 1)
+    pub fn build_end(
+        &mut self,
+        pattern_name: &str,
+        inputs: &[usize],
+        outputs: &[usize]) -> &mut Pattern
+    {
+        let mut signal_start = self.pattern_range.1;
+        let mut pattern_start = self.pattern_range.0;
+        let mut nodes = self.pipeline[pattern_start..].to_vec();
+        let mut pattern_nodes = Vec::new();
+        
+        for node in nodes.iter_mut() {
+            let mut node_inputs = Vec::new();
+            for input in node.get_input() {
+                if let Some(outside_input) = inputs.iter().position(|x| x == input) {
+                    node_inputs.push(PniType::Input(outside_input));
+                } else {
+                    node_inputs.push(PniType::NodeOutput(
+                        self.get_parent_node_index(*input).unwrap() - pattern_start
+                    ))
+                }
+            }
+            pattern_nodes.push(PatternNode::new(
+                node.get_type(),
+                node_inputs,
+            ));
+        }
+
+        let output_node = outputs.iter()
+            .map(|x| self.get_parent_node_index(*x).unwrap() - pattern_start)
+            .collect();
+
+        let new_pattern = Pattern::new(
+            inputs.len(),
+            output_node,
+            pattern_nodes,
+        );
+        self.patterns.insert(pattern_name.to_string(), new_pattern);
+        self.patterns.get_mut(pattern_name).unwrap()
     }
 
-    pub fn add_gate_exact(&mut self, gate_type: &str, input: &[usize], output: usize) -> usize {
-        let gate_type = Self::gain_gate_type(gate_type, input.len());
-        let new_gate = Node::Gate(gate_type, input.to_vec(), output);
+    pub fn add_gate(&mut self, gate_type: &str, input: &[usize]) -> GateOutput {
+        let gate_type = gain_gate_type(gate_type, input.len());
+        let new_gate = Node::Gate(LogicGate::new(gate_type, input, self.signals_size()));
+
         self.pipeline.push(new_gate);
         let node_index = self.pipeline.len() - 1;
-        self.signal_map.push(S::with_parent(None, node_index));
-        node_index
+        self.signals.push(Signal::with_parent(None, node_index));
+
+        GateOutput { gate_id: node_index, output: self.signals_size() - 1 }
     }
-    pub fn pop(&mut self) -> Option<Node> {
-        self.pipeline.pop()
-    }
+
     pub fn advance_output(&mut self, signals: &[usize]) -> Vec<usize> {
         let mut outputs = Vec::new();
         for i in 0..signals.len() {
-            self.signal_map.push(S::from_usize(signals[i]));
-            outputs.push(i + self.signal_size());
+            self.signals.push(Signal::from_usize(signals[i]));
+            outputs.push(self.signals_size() - 1);
         }
         outputs
     }
 
-    pub fn execute_gates(&mut self) {
+    pub fn execute_sequential(&self, input_signals: &[Signal]) -> Vec<Signal> {
+        let mut results = self.signals.clone();
+        input_signals.iter()
+            .enumerate()
+            .for_each(|(i,v)| results[i] = *v);
+
         for node in &self.pipeline {
-            let res = node.execute(&Circuit::choose_signals(
-                self.get_signals(),
-                node.get_input()
-            ));
-            self.signal_map[node.get_output()[0]] = res;
+            node.execute_mut(&mut results);
         }
-    }
-
-    pub fn execute_from_output(&self) {
-
-    }
-    pub fn execute_gates_exact(&mut self, gates: &[usize]) -> Vec<S> {
-        let mut results = self.signal_map.clone();
-
-        let mut gates_vec = gates.iter()
-            .map(|i| (false, self.pipeline[*i].clone()))
-            .collect::<Vec<(bool, Node)>>();
-        for (flag, node) in gates_vec.iter_mut() {
-            let input = &Circuit::choose_signals(
-                &results,
-                node.get_input()
-            );
-            if input.contains(&S::from_usize(0)) {
-                continue;
-            } else {
-                node.execute_mut(&mut results);
-                *flag = true;
-            }
-        }
-
         results
     }
 
-    pub fn for_every_input(&mut self, indexes: &[usize], f: fn(&Circuit<S>, &[usize])) {
-        let mut input_vec = vec![S::default(); self.input];
-        let n = 2u32.pow(self.input as u32);
-        //print!("{}", n);
+    pub fn truth_table(
+        circuit: &Circuit,
+        input_size: usize,
+        choose_outputs: &[usize],
+    ) -> Vec<(Vec<Signal>, Vec<Signal>)> {
+        let n = 2u32.pow(input_size as u32) as usize;
+        let mut result = vec![(vec![], vec![]); n];
+
         for i in 0..n {
             let mut temp = i;
-            for j in 0..self.input {
-                let v= temp % 2 == 1;
+            let mut line_input = vec![0usize; input_size];
+            for j in 0..input_size {
+                let v= temp % 2;
                 temp /= 2;
-                input_vec[self.input - j - 1] = S::from_bool(Some(v));
+                line_input[input_size - j - 1] = v;
             }
-            self.execute_gates();
-            f(self, indexes);
+            result[i].0 = usize_signal_vec(&line_input);
+            let res = circuit.execute_sequential(result[i].0.as_slice());
+            result[i].1 = choose_outputs.iter()
+                .map(|&x| res.get(x).unwrap().clone()).collect()
+        }
+        result
+    }
+
+    pub fn print_truth_table(truth_table: &Vec<(Vec<Signal>, Vec<Signal>)>) {
+        for line in truth_table {
+            for value in line.0.iter() {
+                print!("{:?} ", value);
+            }
+            print!(": ");
+            for value in line.1.iter() {
+                print!("{:?} ", value);
+            }
+            println!();
         }
     }
-    
 
-    pub fn print_output(&self, indexes: &[usize]) {
-        let outputs = Self::choose_signals(self.get_signals(), indexes);
-        println!("{:?}", outputs);
-    }
 }
 
 #[cfg(test)]
@@ -234,14 +201,85 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_circuit() {
-        let mut circuit: Circuit<Signal> = Circuit::new_with_input(3);
-        let and1 = circuit.add_gate("and", &[0, 1]);
-        let rs_q2 = circuit.advance_output(&[1, 0]);
-        let (q, nq) = (rs_q2[0], rs_q2[1]);
-        circuit.add_gate_exact("nand", &[0, q], nq);
-        circuit.add_gate_exact("nand", &[1, nq], q);
-        circuit.set_input(&[0, 1]);
-        println!("{:?}", circuit.get_signals());
+    fn test_truth_table() {
+        let mut circuit = Circuit::new(3);
+        let input = circuit.get_input();
+        let and_output = circuit.add_gate(
+            "and",
+            &input[0..2]).output;
+        let or_output = circuit.add_gate(
+            "or",
+            &input[0..2]
+        ).output;
+        let truth_table = Circuit::truth_table(
+            &circuit,
+            circuit.get_input().len(), 
+            &[and_output, or_output],);
+        Circuit::print_truth_table(&truth_table);
+    }
+    #[test]
+    fn half_adder() {
+        let mut circuit = Circuit::new(2);
+        let input = circuit.get_input();
+        let go1 = circuit.add_gate(
+            "and",
+            &[input[0], input[1]]);
+        let go2 = circuit.add_gate(
+            "xor",
+            &[input[0], input[1]]);
+        let res = circuit.execute_sequential(
+            &usize_signal_vec(&[1, 1])
+        );
+        let output = [go1.output, go2.output];
+        print_output(&res, &output);
+    }
+
+    #[test]
+    fn full_adder() {
+        let mut circuit = Circuit::new(3);
+        let input = circuit.get_input();
+        let (a, b, c0) = (input[0], input[1], input[2]);
+
+        circuit.build_begin();
+
+        let go1 = circuit.add_gate(
+            "xor",
+            &[a, b]
+        );
+        let s = circuit.add_gate(
+            "xor",
+            &[c0, go1.output]
+        ).output;
+
+        let go2 = circuit.add_gate(
+            "and",
+            &[a, b]
+        );
+        let go3 = circuit.add_gate(
+            "and",
+            &[c0, go1.output]
+        );
+        let c1 = circuit.add_gate(
+            "or",
+            &[go2.output, go3.output]
+        ).output;
+
+        let output = [s, c1];
+
+        let fa_pattern = circuit
+            .build_end(
+            "full_adder",
+            &input, &output)
+            .set_name(&["a", "b", "c0"], &[("s", s), ("c1", c1)])
+            .set_description("a + b + c0 -> c1 s");
+
+        println!("{}", fa_pattern);
+
+        let res = circuit.execute_sequential(
+            &usize_signal_vec(&[1, 0, 1])
+        );
+
+
+        print_output(&res, &output);
     }
 }
