@@ -6,11 +6,12 @@
 pub mod signal;
 pub mod circuit;
 
-pub mod gate;
-
 mod msic;
 mod node;
 mod pattern;
+mod table;
+mod sequential;
+mod combinational;
 
 
 
